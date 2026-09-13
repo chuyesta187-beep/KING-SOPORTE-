@@ -1,180 +1,377 @@
 const {
-  EmbedBuilder,
+  ChannelType,
+  PermissionFlagsBits,
   ActionRowBuilder,
+  StringSelectMenuBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  EmbedBuilder
 } = require("discord.js");
 
 const config = require("./config");
+const database = require("./database");
 
 const applications = new Map();
+const applicationChannels = new Map();
 
-const questions = {
-  Staff: [
-    "¿Cuál es tu nombre o cómo te gustaría que te llamemos?",
+const APPLICATION_TYPES = {
+  staff: {
+    name: "Staff",
+    emoji: "👮",
+    channelName: "👮・formularios-staff"
+  },
+  journalist: {
+    name: "Periodista",
+    emoji: "📰",
+    channelName: "📰・formularios-periodista"
+  },
+  economy: {
+    name: "Economía",
+    emoji: "💰",
+    channelName: "💰・formularios-economia"
+  }
+};
+
+const QUESTIONS = {
+  staff: [
+    "¿Cuál es tu nombre o apodo?",
     "¿Cuántos años tienes?",
-    "¿Cuánto tiempo llevas en el servidor?",
-    "¿Has tenido experiencia como Staff anteriormente?",
-    "¿Qué funciones de Staff conoces?",
+    "¿Cuál es tu zona horaria?",
+    "¿Cuánto tiempo llevas en King the Land?",
+    "¿Has pertenecido anteriormente a un equipo Staff?",
+    "¿Qué experiencia tienes como Staff?",
+    "¿Qué funciones de moderación conoces?",
+    "¿Cómo actuarías ante una discusión entre dos miembros?",
+    "¿Qué harías ante una infracción de las normas?",
+    "¿Cómo manejarías una situación en la que un amigo incumple las normas?",
+    "¿Qué harías si un usuario insiste en provocar al Staff?",
+    "¿Cómo actuarías ante una denuncia falsa?",
+    "¿Qué significa para ti trabajar en equipo?",
+    "¿Cuánto tiempo podrías dedicar al servidor?",
     "¿Por qué quieres formar parte del Staff?",
-    "¿Qué cualidades crees que tienes para este puesto?",
-    "¿Cuánto tiempo puedes dedicar al servidor?",
-    "¿Cómo actuarías ante una discusión entre usuarios?",
-    "¿Qué harías si un usuario rompe las reglas?",
-    "¿Qué harías si un amigo tuyo rompe las reglas?",
-    "¿Cómo actuarías ante una situación que no sabes resolver?",
-    "¿Sabes trabajar en equipo?",
-    "¿Cómo recibirías una corrección de un superior?",
     "¿Qué aportarías al equipo Staff?",
-    "¿Por qué deberíamos elegirte?",
-    "¿Hay algo más que quieras añadir?"
+    "¿Por qué deberíamos seleccionarte?"
   ],
 
-  Periodista: [
-    "¿Cuál es tu nombre o cómo te gustaría que te llamemos?",
+  journalist: [
+    "¿Cuál es tu nombre o apodo?",
     "¿Cuántos años tienes?",
-    "¿Cuánto tiempo llevas en el servidor?",
-    "¿Has creado noticias o contenido anteriormente?",
-    "¿Por qué quieres ser Periodista?",
+    "¿Cuál es tu zona horaria?",
+    "¿Cuánto tiempo llevas en King the Land?",
+    "¿Tienes experiencia redactando noticias?",
+    "¿Has trabajado anteriormente como periodista o reportero?",
     "¿Qué tipo de noticias te gustaría publicar?",
     "¿Cómo comprobarías que una noticia es verdadera?",
-    "¿Cómo organizarías una noticia?",
-    "¿Cómo escribirías un título atractivo?",
-    "¿Qué harías si recibes información dudosa?",
-    "¿Sabes trabajar en equipo?",
-    "¿Qué herramientas sabes utilizar para crear contenido?",
-    "¿Con qué frecuencia podrías publicar?",
-    "¿Cómo reaccionarías ante una corrección?",
-    "¿Qué aportarías al equipo de Periodistas?",
-    "¿Por qué deberíamos elegirte?",
-    "¿Hay algo más que quieras añadir?"
+    "¿Qué harías si recibes información que no puedes verificar?",
+    "¿Cómo evitarías difundir rumores?",
+    "¿Cómo organizarías una noticia para que sea fácil de entender?",
+    "¿Qué importancia tiene la neutralidad al informar?",
+    "¿Cómo reaccionarías ante una crítica sobre una publicación?",
+    "¿Cuánto tiempo podrías dedicar a crear contenido?",
+    "¿Qué aportarías al área de Periodismo?",
+    "¿Qué tipo de contenido te gustaría cubrir en el servidor?",
+    "¿Por qué deberíamos seleccionarte?"
   ],
 
-  Economía: [
-    "¿Cuál es tu nombre o cómo te gustaría que te llamemos?",
+  economy: [
+    "¿Cuál es tu nombre o apodo?",
     "¿Cuántos años tienes?",
-    "¿Cuánto tiempo llevas en el servidor?",
-    "¿Has trabajado anteriormente con sistemas económicos?",
-    "¿Por qué quieres formar parte de Economía?",
-    "¿Qué entiendes por una economía equilibrada?",
-    "¿Cómo evitarías abusos dentro del sistema económico?",
-    "¿Cómo organizarías los recursos?",
+    "¿Cuál es tu zona horaria?",
+    "¿Cuánto tiempo llevas en King the Land?",
+    "¿Qué experiencia tienes con sistemas económicos?",
+    "¿Has administrado anteriormente una economía de servidor?",
+    "¿Cómo controlarías una economía para evitar abusos?",
     "¿Cómo detectarías una actividad económica sospechosa?",
-    "¿Qué harías si encuentras un error económico?",
-    "¿Sabes trabajar en equipo?",
-    "¿Cómo actuarías ante una decisión con la que no estás de acuerdo?",
+    "¿Qué harías ante un error en una transacción?",
+    "¿Cómo organizarías los registros económicos?",
+    "¿Cómo equilibrarías ingresos y gastos dentro del sistema?",
+    "¿Qué medidas tomarías para evitar duplicaciones o exploits?",
+    "¿Cómo trabajarías junto al resto del Staff?",
     "¿Cuánto tiempo podrías dedicar al área?",
-    "¿Qué ideas aportarías para mejorar la economía?",
-    "¿Cómo mantendrías organizada la información?",
-    "¿Por qué deberíamos elegirte?",
-    "¿Hay algo más que quieras añadir?"
+    "¿Qué ideas tienes para mejorar la economía?",
+    "¿Qué aportarías al equipo de Economía?",
+    "¿Por qué deberíamos seleccionarte?"
   ]
 };
 
-async function startApplication(user, type) {
-  const selectedQuestions = questions[type];
+function createPostulationPanelComponents() {
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("postulation_type_select")
+    .setPlaceholder("Selecciona el tipo de postulación")
+    .addOptions(
+      Object.entries(APPLICATION_TYPES).map(([value, type]) => ({
+        label: type.name,
+        description: `Postulación para ${type.name}`,
+        value,
+        emoji: type.emoji
+      }))
+    );
 
-  if (!selectedQuestions) {
-    throw new Error("Tipo de postulación inválido.");
+  return [
+    new ActionRowBuilder().addComponents(menu)
+  ];
+}
+
+async function setupPostulationPanel(client) {
+  const channel = await client.channels
+    .fetch(config.channels.postulationPanel)
+    .catch(() => null);
+
+  if (!channel || !channel.isTextBased()) {
+    console.error("❌ No se encontró el canal de postulaciones.");
+    return;
   }
 
-  applications.set(user.id, {
-    userId: user.id,
+  const messages = await channel.messages.fetch({ limit: 50 });
+
+  const oldPanel = messages.find(
+    message =>
+      message.author.id === client.user.id &&
+      message.embeds.some(embed =>
+        embed.title?.includes("Postulaciones")
+      )
+  );
+
+  const embed = new EmbedBuilder()
+    .setTitle("👑 King the Land — Postulaciones")
+    .setDescription(
+      [
+        "Bienvenido al sistema oficial de postulaciones.",
+        "",
+        "Selecciona el área a la que deseas postularte:",
+        "",
+        "👮 **Staff**",
+        "Forma parte del equipo encargado de la moderación y atención del servidor.",
+        "",
+        "📰 **Periodista**",
+        "Participa en la creación y publicación de noticias y contenido.",
+        "",
+        "💰 **Economía**",
+        "Ayuda a administrar y desarrollar el sistema económico.",
+        "",
+        "📩 El formulario se realizará por MD.",
+        "✨ Responde todas las preguntas con sinceridad."
+      ].join("\n")
+    );
+
+  if (oldPanel) {
+    await oldPanel.edit({
+      embeds: [embed],
+      components: createPostulationPanelComponents()
+    });
+  } else {
+    await channel.send({
+      embeds: [embed],
+      components: createPostulationPanelComponents()
+    });
+  }
+
+  console.log("✅ Panel de postulaciones configurado.");
+}
+
+async function setupApplicationChannels(client) {
+  const guild = await client.guilds.fetch(config.guildId);
+
+  for (const [type, data] of Object.entries(APPLICATION_TYPES)) {
+    let channel = guild.channels.cache.find(
+      c => c.name === data.channelName
+    );
+
+    if (!channel) {
+      channel = await guild.channels.create({
+        name: data.channelName,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          {
+            id: guild.roles.everyone.id,
+            deny: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: config.roles.postulationReview,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.ReadMessageHistory
+            ]
+          }
+        ]
+      });
+
+      await channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle(`${data.emoji} Formularios — ${data.name}`)
+            .setDescription(
+              `Aquí se enviarán automáticamente las postulaciones de **${data.name}**.`
+            )
+        ]
+      });
+    }
+
+    applicationChannels.set(type, channel.id);
+  }
+
+  console.log("✅ Canales de postulaciones configurados.");
+}
+
+async function startApplication(interaction, type) {
+  const applicationType = APPLICATION_TYPES[type];
+
+  if (!applicationType) {
+    return interaction.reply({
+      content: "❌ Tipo de postulación inválido.",
+      ephemeral: true
+    });
+  }
+
+  if (applications.has(interaction.user.id)) {
+    return interaction.reply({
+      content: "❌ Ya tienes una postulación en proceso.",
+      ephemeral: true
+    });
+  }
+
+  const questions = QUESTIONS[type];
+
+  applications.set(interaction.user.id, {
+    id: `${interaction.user.id}-${Date.now()}`,
+    userId: interaction.user.id,
+    username: interaction.user.tag,
     type,
     questionIndex: 0,
-    answers: []
+    questions,
+    answers: [],
+    status: "in_progress",
+    startedAt: new Date().toISOString()
   });
 
-  await user.send(
-    `👑 **KING SUPPORT — POSTULACIÓN ${type.toUpperCase()}**\n\n` +
-    `Tu formulario ha comenzado.\n` +
-    `Responde cada pregunta con una sola respuesta.\n\n` +
-    `📝 **Pregunta 1/${selectedQuestions.length}:**\n` +
-    selectedQuestions[0]
-  );
+  await interaction.reply({
+    content:
+      `📩 Te enviaré el formulario de **${applicationType.name}** por MD. ` +
+      "Revisa tus mensajes privados.",
+    ephemeral: true
+  });
+
+  const user = interaction.user;
+
+  try {
+    await user.send(
+      `👑 **Postulación — ${applicationType.name}**\n\n` +
+      `Responderás **${questions.length} preguntas**, una por una.\n\n` +
+      `**Pregunta 1/${questions.length}**\n${questions[0]}`
+    );
+  } catch {
+    applications.delete(interaction.user.id);
+
+    await interaction.followUp({
+      content:
+        "❌ No pude enviarte MD. Activa los mensajes privados del servidor e inténtalo nuevamente.",
+      ephemeral: true
+    });
+  }
 }
 
 async function handleApplicationMessage(message) {
-  if (message.author.bot) return;
+  if (message.author.bot || message.guild) return;
 
   const application = applications.get(message.author.id);
 
   if (!application) return;
 
-  const selectedQuestions = questions[application.type];
+  const answer = message.content?.trim();
 
-  application.answers.push(message.content);
+  if (!answer) {
+    await message.reply("❌ Debes escribir una respuesta.");
+    return;
+  }
+
+  application.answers.push({
+    question: application.questions[application.questionIndex],
+    answer
+  });
+
   application.questionIndex++;
 
-  if (application.questionIndex >= selectedQuestions.length) {
-    await finishApplication(message.author);
+  if (application.questionIndex >= application.questions.length) {
+    await finishApplication(message, application);
     return;
   }
 
   const number = application.questionIndex + 1;
+  const total = application.questions.length;
 
-  await message.author.send(
-    `📝 **Pregunta ${number}/${selectedQuestions.length}:**\n` +
-    selectedQuestions[application.questionIndex]
+  await message.reply(
+    `**Pregunta ${number}/${total}**\n${application.questions[application.questionIndex]}`
   );
 }
 
-async function finishApplication(user) {
-  const application = applications.get(user.id);
+async function finishApplication(message, application) {
+  application.status = "pending";
+  application.finishedAt = new Date().toISOString();
 
-  if (!application) return;
+  database.createApplication(application.id, application);
+
+  applications.delete(message.author.id);
+
+  const channelId = applicationChannels.get(application.type);
+
+  const channel = channelId
+    ? await message.client.channels.fetch(channelId).catch(() => null)
+    : null;
+
+  if (!channel) {
+    await message.reply(
+      "⚠️ Tu postulación fue guardada, pero no se encontró el canal de revisión."
+    );
+    return;
+  }
+
+  const type = APPLICATION_TYPES[application.type];
 
   const embed = new EmbedBuilder()
-    .setTitle(`👑 Postulación — ${application.type}`)
-    .setDescription(
-      `👤 **Usuario:** ${user}\n` +
-      `📌 **Tipo:** ${application.type}\n\n` +
-      `**Respuestas:**\n\n` +
-      application.answers
-        .map(
-          (answer, index) =>
-            `**${index + 1}.** ${answer}`
-        )
-        .join("\n\n")
+    .setTitle(
+      `${type.emoji} Nueva postulación — ${type.name}`
     )
-    .setTimestamp();
+    .setDescription(
+      [
+        `👤 **Usuario:** <@${application.userId}>`,
+        `🆔 **ID:** ${application.userId}`,
+        `📅 **Enviada:** <t:${Math.floor(Date.now() / 1000)}:F>`,
+        "",
+        ...application.answers.map(
+          (item, index) =>
+            `**${index + 1}. ${item.question}**\n${item.answer}`
+        )
+      ].join("\n\n")
+    );
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`application_accept_${user.id}`)
+      .setCustomId(`application_accept_${application.userId}`)
       .setLabel("Aceptar")
       .setEmoji("✅")
       .setStyle(ButtonStyle.Success),
 
     new ButtonBuilder()
-      .setCustomId(`application_reject_${user.id}`)
+      .setCustomId(`application_reject_${application.userId}`)
       .setLabel("Rechazar")
       .setEmoji("❌")
       .setStyle(ButtonStyle.Danger)
   );
 
-  // El canal exacto de cada tipo se configurará en config.js
-  const channelId = config.applicationChannels?.[application.type];
+  await channel.send({
+    embeds: [embed],
+    components: [buttons]
+  });
 
-  if (channelId) {
-    const channel = await user.client.channels.fetch(channelId);
-
-    await channel.send({
-      embeds: [embed],
-      components: [buttons]
-    });
-  }
-
-  await user.send(
-    `✅ **Tu postulación de ${application.type} ha sido enviada correctamente.**\n\n` +
-    `Ahora será revisada por el equipo correspondiente.`
+  await message.reply(
+    "✅ **Tu postulación fue enviada correctamente.**\n" +
+    "El equipo encargado la revisará y recibirás el resultado por MD."
   );
-
-  applications.delete(user.id);
 }
 
 async function handleApplicationDecision(interaction) {
-  const [action, type, userId] = interaction.customId.split("_");
+  if (!interaction.customId.startsWith("application_")) return;
 
   const member = interaction.member;
 
@@ -185,39 +382,93 @@ async function handleApplicationDecision(interaction) {
     });
   }
 
-  const user = await interaction.client.users.fetch(userId);
+  const [, action, userId] = interaction.customId.split("_");
 
-  if (action === "application") {
-    return;
+  if (!["accept", "reject"].includes(action) || !userId) {
+    return interaction.reply({
+      content: "❌ Acción de postulación inválida.",
+      ephemeral: true
+    });
   }
 
-  if (type === "accept") {
+  const application = Object.values(database.load().applications)
+    .find(app => app.userId === userId);
+
+  if (!application) {
+    return interaction.reply({
+      content: "❌ No se encontró la postulación.",
+      ephemeral: true
+    });
+  }
+
+  const newStatus = action === "accept"
+    ? "accepted"
+    : "rejected";
+
+  database.updateApplication(application.id, {
+    status: newStatus,
+    reviewedBy: interaction.user.id,
+    reviewedAt: new Date().toISOString()
+  });
+
+  const user = await interaction.client.users
+    .fetch(userId)
+    .catch(() => null);
+
+  if (user) {
     await user.send(
-      "✅ **Tu postulación ha sido aceptada.**\n\n" +
-      "¡Bienvenido al equipo de King the Land!"
-    );
+      action === "accept"
+        ? "🎉 **¡Tu postulación ha sido aceptada!**\n\nBienvenido/a al equipo de King the Land."
+        : "❌ **Tu postulación ha sido rechazada.**\n\nGracias por participar en el proceso."
+    ).catch(() => {});
   }
 
-  if (type === "reject") {
-    await user.send(
-      "❌ **Tu postulación ha sido rechazada.**\n\n" +
-      "Gracias por participar en el proceso."
-    );
-  }
+  const disabledRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`application_accept_${userId}`)
+      .setLabel("Aceptar")
+      .setEmoji("✅")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(true),
+
+    new ButtonBuilder()
+      .setCustomId(`application_reject_${userId}`)
+      .setLabel("Rechazar")
+      .setEmoji("❌")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(true)
+  );
+
+  await interaction.message.edit({
+    components: [disabledRow]
+  });
 
   await interaction.reply({
     content:
-      type === "accept"
+      action === "accept"
         ? "✅ Postulación aceptada."
         : "❌ Postulación rechazada.",
     ephemeral: true
   });
 }
 
+async function handlePostulationSelect(interaction) {
+  if (interaction.customId !== "postulation_type_select") return;
+
+  await startApplication(
+    interaction,
+    interaction.values[0]
+  );
+}
+
 module.exports = {
+  setupPostulationPanel,
+  setupApplicationChannels,
   startApplication,
   handleApplicationMessage,
-  finishApplication,
   handleApplicationDecision,
-  questions
+  handlePostulationSelect,
+  applications,
+  applicationChannels,
+  QUESTIONS
 };
